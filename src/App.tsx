@@ -24,12 +24,12 @@ const SHOW_ALL_KEY = "dynasty-helper:show-all-leagues";
 
 type Tab = "team" | "league" | "players" | "trades" | "chat";
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "team", label: "My Team" },
-  { id: "league", label: "Power Rankings" },
-  { id: "players", label: "Players" },
-  { id: "trades", label: "Trades" },
-  { id: "chat", label: "Ask Claude" },
+const TABS: Array<{ id: Tab; label: string; short: string }> = [
+  { id: "team", label: "My Team", short: "Team" },
+  { id: "league", label: "Standings", short: "Table" },
+  { id: "players", label: "Players", short: "Players" },
+  { id: "trades", label: "Transactions", short: "Trades" },
+  { id: "chat", label: "Ask Claude", short: "Ask" },
 ];
 
 function load<T>(key: string): T | null {
@@ -262,19 +262,23 @@ export function App() {
         </button>
       </header>
 
-      <nav className="tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`tab ${tab === t.id ? "active" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <div className="shell">
+        <nav className="contents" aria-label="Sections">
+          <h2 className="contents-head">Contents</h2>
+          {TABS.map((t, i) => (
+            <button
+              key={t.id}
+              className={`contents-item ${tab === t.id ? "active" : ""}`}
+              onClick={() => setTab(t.id)}
+              aria-current={tab === t.id ? "page" : undefined}
+            >
+              <span className="contents-no">{String(i + 1).padStart(2, "0")}</span>
+              <span className="contents-label">{t.label}</span>
+            </button>
+          ))}
+        </nav>
 
-      <main className="main">
+        <main className="main">
         {error && <div className="notice err" style={{ marginBottom: 16 }}>{error}</div>}
 
         {data?.format.valuesApproximated && (
@@ -326,7 +330,22 @@ export function App() {
             {tab === "chat" && chatCtx && <Chat ctx={chatCtx} />}
           </>
         )}
-      </main>
+        </main>
+      </div>
+
+      {/* Thumb-reachable navigation on a phone, where a sidebar cannot go. */}
+      <nav className="tabbar" aria-label="Sections">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`tabbar-item ${tab === t.id ? "active" : ""}`}
+            onClick={() => setTab(t.id)}
+            aria-current={tab === t.id ? "page" : undefined}
+          >
+            {t.short}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

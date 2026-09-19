@@ -3,62 +3,46 @@ import { contentionLabel } from "../lib/analytics";
 
 const money = (n: number) => Math.round(n).toLocaleString();
 
+/**
+ * One ranked standings listing rather than a chart stacked on a duplicate
+ * table — each row carries its own bar, so the comparison and the detail
+ * live in the same place.
+ */
 export function PowerRankings({ teams, onPick }: { teams: TeamView[]; onPick: (t: TeamView) => void }) {
   const max = Math.max(...teams.map((t) => t.totalValue), 1);
 
   return (
     <>
-      <div className="card">
-        <h3>Dynasty value — every asset, players and picks</h3>
+      <h2 className="rule-head">Standings by dynasty value <i>players and picks</i></h2>
+      <ol className="standings">
         {teams.map((t, i) => (
-          <div className="bar-row" key={t.rosterId}>
-            <div className="bar-track" style={{ cursor: "pointer" }} onClick={() => onPick(t)}>
-              <div className={`bar-fill ${t.isMe ? "me" : ""}`} style={{ width: `${(t.totalValue / max) * 100}%` }} />
-              <div className="bar-label">
-                <strong>{i + 1}.</strong> {t.teamName}
-                {t.isMe && <span className="tag" style={{ color: "var(--good)" }}>you</span>}
-              </div>
-            </div>
-            <span className="num" style={{ minWidth: 70, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-              {money(t.totalValue)}
+          <li
+            key={t.rosterId}
+            className={`standing${t.isMe ? " is-me" : ""}`}
+            onClick={() => onPick(t)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(t); } }}
+          >
+            <span className="standing-rank">{String(i + 1).padStart(2, "0")}</span>
+            <span className="standing-id">
+              <b>{t.teamName}</b>
+              <i>{t.ownerName} · {contentionLabel(t, teams)}</i>
             </span>
-          </div>
+            <span className="standing-bar">
+              <span className="standing-fill" style={{ width: `${(t.totalValue / max) * 100}%` }} />
+              <span className="standing-split">
+                <em>{money(t.playerValue)} players</em>
+                <em>{money(t.pickValue)} picks</em>
+              </span>
+            </span>
+            <span className="standing-figs">
+              <b>{money(t.totalValue)}</b>
+              <i>{t.wins}&ndash;{t.losses} · age {t.weightedAge?.toFixed(1) ?? "—"}</i>
+            </span>
+          </li>
         ))}
-      </div>
-
-      <div className="section-title">Team detail</div>
-      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-        <table className="table">
-          <thead>
-            <tr>
-              <th className="no-sort">#</th>
-              <th className="no-sort">Team</th>
-              <th className="no-sort">Record</th>
-              <th className="no-sort num">Players</th>
-              <th className="no-sort num">Picks</th>
-              <th className="no-sort num">Age</th>
-              <th className="no-sort">Window</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams.map((t, i) => (
-              <tr key={t.rosterId} style={{ cursor: "pointer" }} onClick={() => onPick(t)}>
-                <td className="muted">{i + 1}</td>
-                <td>
-                  {t.teamName}
-                  {t.isMe && <span className="tag" style={{ color: "var(--good)" }}>you</span>}
-                  <div className="muted" style={{ fontSize: 12 }}>{t.ownerName}</div>
-                </td>
-                <td className="muted">{t.wins}-{t.losses}{t.ties ? `-${t.ties}` : ""}</td>
-                <td className="num">{money(t.playerValue)}</td>
-                <td className="num">{money(t.pickValue)}</td>
-                <td className="num">{t.weightedAge != null ? t.weightedAge.toFixed(1) : "—"}</td>
-                <td className="muted" style={{ fontSize: 12 }}>{contentionLabel(t, teams)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      </ol>
     </>
   );
 }

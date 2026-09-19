@@ -5,6 +5,25 @@ type SortKey = "value" | "name" | "position" | "age" | "trend30Day";
 
 const money = (n: number) => Math.round(n).toLocaleString();
 
+/**
+ * Sleeper reports an IR slot and an injury status separately, and for a
+ * player on IR both say "IR" — so dedupe before rendering.
+ */
+function statusTags(a: RosterAsset): Array<{ label: string; hurt: boolean }> {
+  const out: Array<{ label: string; hurt: boolean }> = [];
+  const seen = new Set<string>();
+  const add = (label: string | null, hurt: boolean) => {
+    if (!label) return;
+    const key = label.toUpperCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ label, hurt });
+  };
+  add(a.onIr ? "IR" : null, false);
+  add(a.injury, true);
+  return out;
+}
+
 export function RosterTable({ assets, showOwner }: { assets: RosterAsset[]; showOwner?: (a: RosterAsset) => string }) {
   const [sort, setSort] = useState<SortKey>("value");
   const [asc, setAsc] = useState(false);
@@ -41,7 +60,7 @@ export function RosterTable({ assets, showOwner }: { assets: RosterAsset[]; show
   if (!assets.length) return <p className="muted">No assets to show.</p>;
 
   return (
-    <table className="table">
+    <table className={`table${showOwner ? " with-owner" : ""}`}>
       <thead>
         <tr>
           {head("position", "Pos")}
@@ -62,13 +81,14 @@ export function RosterTable({ assets, showOwner }: { assets: RosterAsset[]; show
               {a.team && <span className="muted"> · {a.team}</span>}
               {a.positionRank > 0 && <span className="tag">{a.position}{a.positionRank}</span>}
               {a.onTaxi && <span className="tag">taxi</span>}
-              {a.onIr && <span className="tag">IR</span>}
-              {a.injury && <span className="tag inj">{a.injury}</span>}
+              {statusTags(a).map((t) => (
+                <span className={`tag${t.hurt ? " inj" : ""}`} key={t.label}>{t.label}</span>
+              ))}
             </td>
-            {showOwner && <td className="muted">{showOwner(a)}</td>}
-            <td className="num">{a.age != null ? a.age.toFixed(1) : "—"}</td>
-            <td className="num">{a.value ? money(a.value) : <span className="muted">—</span>}</td>
-            <td className={`num trend ${a.trend30Day > 0 ? "up" : a.trend30Day < 0 ? "down" : ""}`}>
+            {showOwner && <td className="muted" data-label="Owner">{showOwner(a)}</td>}
+            <td className="num" data-label="Age">{a.age != null ? a.age.toFixed(1) : "—"}</td>
+            <td className="num" data-label="Value">{a.value ? money(a.value) : <span className="muted">—</span>}</td>
+            <td className={`num trend ${a.trend30Day > 0 ? "up" : a.trend30Day < 0 ? "down" : ""}`} data-label="30d">
               {a.trend30Day ? `${a.trend30Day > 0 ? "+" : ""}${money(a.trend30Day)}` : "—"}
             </td>
           </tr>

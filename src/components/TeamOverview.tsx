@@ -1,114 +1,94 @@
 import type { League } from "../types";
-import { contentionLabel, positionAverages, rosterHoles, type TeamView } from "../lib/analytics";
-import { RosterTable } from "./RosterTable";
+import { positionAverages, type TeamView } from "../lib/analytics";
+import { TeamCover } from "./TeamCover";
+import { RosterListing } from "./RosterListing";
 
 const money = (n: number) => Math.round(n).toLocaleString();
 const POS = ["QB", "RB", "WR", "TE"] as const;
-const COLORS: Record<string, string> = { QB: "var(--qb)", RB: "var(--rb)", WR: "var(--wr)", TE: "var(--te)" };
+const COLORS: Record<string, string> = {
+  QB: "var(--qb)", RB: "var(--rb)", WR: "var(--wr)", TE: "var(--te)",
+};
 
 export function TeamOverview({ team, teams, league }: { team: TeamView; teams: TeamView[]; league: League }) {
-  const rank = teams.findIndex((t) => t.rosterId === team.rosterId) + 1;
   const avgs = positionAverages(teams);
-  const holes = rosterHoles(team, league);
   const posTotal = POS.reduce((s, p) => s + (team.byPosition[p] ?? 0), 0);
+  const benchValue = team.playerValue - team.starterValue;
 
   return (
     <>
-      <div className="grid cols-4">
-        <div className="card stat">
-          <div className="value">#{rank}<span className="muted" style={{ fontSize: 16 }}>/{teams.length}</span></div>
-          <div className="label">Dynasty power rank</div>
-          <div className="sub">{money(team.totalValue)} total value</div>
-        </div>
-        <div className="card stat">
-          <div className="value">{team.wins}-{team.losses}{team.ties ? `-${team.ties}` : ""}</div>
-          <div className="label">Record</div>
-          <div className="sub">{team.pointsFor.toFixed(1)} points for</div>
-        </div>
-        <div className="card stat">
-          <div className="value">{team.weightedAge != null ? team.weightedAge.toFixed(1) : "—"}</div>
-          <div className="label">Value-weighted age</div>
-          <div className="sub">{contentionLabel(team, teams)}</div>
-        </div>
-        <div className="card stat">
-          <div className="value">{money(team.pickValue)}</div>
-          <div className="label">Draft capital</div>
-          <div className="sub">{team.picks.length} future pick{team.picks.length === 1 ? "" : "s"}</div>
-        </div>
-      </div>
+      <TeamCover team={team} teams={teams} league={league} />
 
-      <div className="grid cols-2" style={{ marginTop: 16 }}>
-        <div className="card">
-          <h3>Positional value vs league average</h3>
-          {POS.map((p) => {
-            const mine = team.byPosition[p] ?? 0;
-            const avg = avgs[p] ?? 0;
-            const max = Math.max(mine, avg, 1);
-            const diff = avg > 0 ? ((mine - avg) / avg) * 100 : 0;
-            return (
-              <div key={p} style={{ marginBottom: 12 }}>
-                <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
-                  <span><span className={`pos ${p}`}>{p}</span> <span className="muted">{money(mine)}</span></span>
-                  <span className={diff >= 0 ? "trend up" : "trend down"}>
-                    {diff >= 0 ? "+" : ""}{diff.toFixed(0)}% vs avg
-                  </span>
-                </div>
-                <div className="bar-track" style={{ height: 8 }}>
-                  <div className="bar-fill" style={{ width: `${(mine / max) * 100}%`, background: COLORS[p], height: 8 }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* Editorial split: the roster is the story, the analysis is the margin. */}
+      <div className="spread">
+        <main className="spread-main">
+          <h2 className="rule-head">Team listing <i>{team.players.length} players</i></h2>
+          <RosterListing assets={team.players} />
+        </main>
 
-        <div className="card">
-          <h3>Roster composition</h3>
-          <div className="stacked" title="Share of player value by position">
+        <aside className="spread-rail">
+          <section className="rail-block">
+            <h3 className="rail-head">Against league average</h3>
             {POS.map((p) => {
-              const v = team.byPosition[p] ?? 0;
-              const pct = posTotal > 0 ? (v / posTotal) * 100 : 0;
-              return pct > 0 ? (
-                <div key={p} style={{ width: `${pct}%`, background: COLORS[p] }} title={`${p} ${pct.toFixed(0)}%`} />
-              ) : null;
+              const mine = team.byPosition[p] ?? 0;
+              const avg = avgs[p] ?? 0;
+              const diff = avg > 0 ? ((mine - avg) / avg) * 100 : 0;
+              const max = Math.max(mine, avg, 1);
+              return (
+                <div className="gauge" key={p}>
+                  <div className="gauge-top">
+                    <span className={`pos ${p}`}>{p}</span>
+                    <b>{money(mine)}</b>
+                    <i className={diff >= 0 ? "up" : "down"}>
+                      {diff >= 0 ? "+" : ""}{diff.toFixed(0)}%
+                    </i>
+                  </div>
+                  <div className="gauge-track">
+                    <div className="gauge-fill" style={{ width: `${(mine / max) * 100}%`, background: COLORS[p] }} />
+                    <div className="gauge-mark" style={{ left: `${(avg / max) * 100}%` }} title={`League average ${money(avg)}`} />
+                  </div>
+                </div>
+              );
             })}
-          </div>
-          <div className="row" style={{ marginTop: 10, gap: 14 }}>
-            {POS.map((p) => (
-              <span key={p} className="muted" style={{ fontSize: 12 }}>
-                <span style={{ color: COLORS[p] }}>■</span> {p}{" "}
-                {posTotal > 0 ? `${(((team.byPosition[p] ?? 0) / posTotal) * 100).toFixed(0)}%` : "0%"}
-              </span>
-            ))}
-          </div>
+            <p className="rail-note">The notch marks the league average.</p>
+          </section>
 
-          <h3 style={{ marginTop: 20 }}>Starters vs bench</h3>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <span>Starting lineup</span><strong>{money(team.starterValue)}</strong>
-          </div>
-          <div className="row" style={{ justifyContent: "space-between", marginTop: 4 }}>
-            <span className="muted">Bench & taxi</span>
-            <span className="muted">{money(team.playerValue - team.starterValue)}</span>
-          </div>
+          <section className="rail-block">
+            <h3 className="rail-head">Where the value sits</h3>
+            <div className="stacked">
+              {POS.map((p) => {
+                const pct = posTotal > 0 ? ((team.byPosition[p] ?? 0) / posTotal) * 100 : 0;
+                return pct > 0 ? (
+                  <div key={p} style={{ width: `${pct}%`, background: COLORS[p] }} title={`${p} ${pct.toFixed(0)}%`} />
+                ) : null;
+              })}
+            </div>
+            <ul className="key">
+              {POS.map((p) => (
+                <li key={p}>
+                  <i style={{ background: COLORS[p] }} />{p}
+                  <b>{posTotal > 0 ? `${(((team.byPosition[p] ?? 0) / posTotal) * 100).toFixed(0)}%` : "0%"}</b>
+                </li>
+              ))}
+            </ul>
+            <dl className="split">
+              <div><dt>Starting lineup</dt><dd>{money(team.starterValue)}</dd></div>
+              <div><dt>Bench &amp; taxi</dt><dd>{money(benchValue)}</dd></div>
+            </dl>
+          </section>
 
-          {holes.length > 0 && (
-            <>
-              <h3 style={{ marginTop: 20 }}>Roster gaps</h3>
-              <ul style={{ margin: 0, paddingLeft: 18, color: "var(--warn)" }}>
-                {holes.map((h) => <li key={h}>{h}</li>)}
-              </ul>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="section-title">Roster ({team.players.length} players)</div>
-      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-        <RosterTable assets={team.players} />
-      </div>
-
-      <div className="section-title">Draft picks</div>
-      <div className="card" style={{ padding: 0, overflowX: "auto" }}>
-        <RosterTable assets={team.picks} />
+          <section className="rail-block">
+            <h3 className="rail-head">Draft capital <i>{team.picks.length}</i></h3>
+            <ol className="picks">
+              {team.picks.map((p) => (
+                <li key={p.id}>
+                  <span>{p.name}</span>
+                  <b>{p.value ? money(p.value) : "—"}</b>
+                </li>
+              ))}
+              {!team.picks.length && <li className="muted">No future picks.</li>}
+            </ol>
+          </section>
+        </aside>
       </div>
     </>
   );
