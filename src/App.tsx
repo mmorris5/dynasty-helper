@@ -6,7 +6,7 @@ import { PlayersTab } from "./components/PlayersTab";
 import { TransactionsTab } from "./components/TransactionsTab";
 import { Chat } from "./components/Chat";
 import { buildTeams, type TeamView } from "./lib/analytics";
-import { detectFormat } from "./lib/format";
+import { detectFormat, isDynastyLeague } from "./lib/format";
 import { getValues, ordinal } from "./lib/values";
 import { cacheClear } from "./lib/cache";
 import {
@@ -20,6 +20,7 @@ import type { LeagueContext } from "./lib/claude";
 
 const USER_KEY = "dynasty-helper:user";
 const LEAGUE_KEY = "dynasty-helper:league";
+const SHOW_ALL_KEY = "dynasty-helper:show-all-leagues";
 
 type Tab = "team" | "league" | "players" | "trades" | "chat";
 
@@ -56,6 +57,7 @@ interface LeagueData {
 export function App() {
   const [user, setUser] = useState<SleeperUser | null>(() => load<SleeperUser>(USER_KEY));
   const [leagues, setLeagues] = useState<League[] | null>(null);
+  const [showAll, setShowAll] = useState<boolean>(() => load<boolean>(SHOW_ALL_KEY) ?? false);
   const [leagueId, setLeagueId] = useState<string | null>(() => load<string>(LEAGUE_KEY));
   const [data, setData] = useState<LeagueData | null>(null);
   const [tab, setTab] = useState<Tab>("team");
@@ -74,8 +76,10 @@ export function App() {
         const list = await getLeagues(user.user_id, state.season);
         if (cancelled) return;
         setLeagues(list);
-        if (list.length && !list.some((l) => l.league_id === leagueId)) {
-          setLeagueId(list[0].league_id);
+        const preferred = list.filter(isDynastyLeague);
+        const pickFrom = preferred.length ? preferred : list;
+        if (pickFrom.length && !pickFrom.some((l) => l.league_id === leagueId)) {
+          setLeagueId(pickFrom[0].league_id);
         }
         if (!list.length) setError(`No NFL leagues found for ${user.display_name} in ${state.season}.`);
       } catch (e) {
@@ -139,13 +143,33 @@ export function App() {
     return () => { cancelled = true; };
   }, [user, leagueId]);
 
+  useEffect(() => { save(SHOW_ALL_KEY, showAll); }, [showAll]);
   useEffect(() => { if (user) save(USER_KEY, user); }, [user]);
   useEffect(() => { if (leagueId) save(LEAGUE_KEY, leagueId); }, [leagueId]);
+
+  const dynastyLeagues = useMemo(
+    () => (leagues ?? []).filter(isDynastyLeague),
+    [leagues],
+  );
+  const hiddenCount = (leagues?.length ?? 0) - dynastyLeagues.length;
+  // With no dynasty leagues at all, showing an empty picker would be worse than showing everything.
+  const visibleLeagues = useMemo(
+    () => (showAll || dynastyLeagues.length === 0 ? (leagues ?? []) : dynastyLeagues),
+    [showAll, dynastyLeagues, leagues],
+  );
 
   const myTeam = useMemo(
     () => data?.teams.find((t) => t.isMe) ?? null,
     [data],
   );
+
+  useEffect(() => {
+    if (!visibleLeagues.length) return;
+    if (!visibleLeagues.some((l) => l.league_id === leagueId)) {
+      setLeagueId(visibleLeagues[0].league_id);
+    }
+  }, [visibleLeagues, leagueId]);
+
   const shownTeam = useMemo(() => {
     if (!data) return null;
     if (viewRosterId != null) return data.teams.find((t) => t.rosterId === viewRosterId) ?? myTeam;
@@ -198,16 +222,29 @@ export function App() {
       <header className="header">
         <div className="brand">Dynasty <span>Helper</span></div>
 
-        {leagues && leagues.length > 0 && (
+        {visibleLeagues.length > 0 && (
           <select
             className="league-select"
             value={leagueId ?? ""}
             onChange={(e) => setLeagueId(e.target.value)}
           >
-            {leagues.map((l) => (
-              <option key={l.league_id} value={l.league_id}>{l.name}</option>
+            {visibleLeagues.map((l) => (
+              <option key={l.league_id} value={l.league_id}>
+                {l.name}{showAll && !isDynastyLeague(l) ? " (not dynasty)" : ""}
+              </option>
             ))}
           </select>
+        )}
+        {hiddenCount > 0 && dynastyLeagues.length > 0 && (
+          <button
+            className="btn"
+            onClick={() => setShowAll(!showAll)}
+            title={showAll
+              ? "Show only dynasty leagues"
+              : `Also show ${hiddenCount} redraft/survivor league${hiddenCount === 1 ? "" : "s"}`}
+          >
+            {showAll ? "Dynasty only" : `+${hiddenCount} other`}
+          </button>
         )}
         {data && <span className="format-chip">{data.format.label} · Week {data.week}</span>}
 

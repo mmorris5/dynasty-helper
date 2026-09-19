@@ -44,6 +44,16 @@ npm run dev
 
 Then enter your Sleeper **username** (not display name). Nothing else to configure.
 
+## League filtering
+
+The picker shows only your **dynasty** leagues, detected from Sleeper's `settings.type` (`2` =
+dynasty). Redraft, best ball, keeper, and survivor leagues are hidden, since dynasty trade values
+don't mean anything in them.
+
+If you have leagues it filters out, a **+N other** button appears next to the picker to show them
+anyway, labelled `(not dynasty)`. The choice is remembered. If none of your leagues are dynasty,
+every league is shown rather than an empty picker.
+
 ## Deploying to GitHub Pages
 
 1. Push this repo to GitHub.

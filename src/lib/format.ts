@@ -3,6 +3,14 @@ import type { League, LeagueFormat } from "../types";
 const BENCH = new Set(["BN", "IR", "TAXI"]);
 
 /**
+ * Sleeper's `settings.type`: 0 redraft, 1 keeper, 2 dynasty, 3 survivor.
+ * Only type 2 carries rosters year over year in the way dynasty values assume.
+ */
+export function isDynastyLeague(league: League): boolean {
+  return league.settings?.type === 2;
+}
+
+/**
  * Derive the scoring/roster shape that decides which value set applies.
  * Superflex vs 1QB in particular swings quarterback values by multiples.
  */
